@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Train Your Dragon - RPG</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="instructions">
+        <h3>🐉 HOW TO PLAY</h3>
+        <strong>Act 1 - Forest:</strong><br>
+        Arrow Keys = Move<br>
+        Click = Talk/Bond<br><br>
+        <strong>Act 3 - Battle:</strong><br>
+        Arrow Keys = Fly (Move freely)<br>
+        SPACE = Shoot Fireball<br>
+        R = Retry
+    </div>
+    <div id="game-container"></div>
+    
+    <script src="classes.js"></script>
+    <script src="scenes.js"></script>
+    
+    <script>
+        window.addEventListener('load', () => {
+            const config = {
+                type: Phaser.AUTO,
+                width: 800,
+                height: 600,
+                parent: 'game-container',
+                pixelArt: true,
+                backgroundColor: '#0f0f1e',
+                physics: {
+                    default: 'arcade',
+                    arcade: { gravity: { y: 0 }, debug: false }
+                },
+                scene: [IntroScene, ExplorationScene, BattleScene, VictoryScene]
+            };
+
+            const game = new Phaser.Game(config);
+        });
+    </script>
+</body>
+</html>
