@@ -28,7 +28,6 @@ class IntroScene extends Phaser.Scene {
         
         this.physics.add.overlap(this.player.getSprite(), this.dragon.getSprite(), () => this.onPlayerNearDragon(), null, this);
         
-        // Intro Text
         const wakeText = this.add.text(400, 100, 'You wake up in a mysterious forest...', { fontSize: '24px', fill: '#ffffff', fontFamily: 'Courier New', stroke: '#000000', strokeThickness: 4, align: 'center' }).setOrigin(0.5).setAlpha(0);
         this.tweens.add({ targets: wakeText, alpha: 1, duration: 2000, onComplete: () => {
             this.time.delayedCall(2000, () => {
@@ -41,35 +40,131 @@ class IntroScene extends Phaser.Scene {
     }
 
     createForest() {
-        const sky = this.add.graphics();
-        sky.fillGradientStyle(0x2d4a3e, 0x2d4a3e, 0x1a2e1a, 0x1a2e1a, 1);
-        sky.fillRect(0, 0, 800, 600);
+    const width = 800;
+    const height = 600;
+    const horizonY = 200;
+
+    // 1. SKY & ATMOSPHERE
+    // Darker midnight blue to a deep forest green near the horizon
+    const sky = this.add.graphics();
+    sky.fillGradientStyle(0x050a05, 0x050a05, 0x1a2e1a, 0x1a2e1a, 1);
+    sky.fillRect(0, 0, width, horizonY);
+    
+    // Add distant "stars" or fireflies in the sky
+    for (let i = 0; i < 30; i++) {
+        const star = this.add.graphics();
+        star.fillStyle(0xffffff, Phaser.Math.FloatBetween(0.1, 0.4));
+        star.fillCircle(Phaser.Math.Between(0, width), Phaser.Math.Between(0, horizonY), 1);
+    }
+
+    // 2. GROUND WITH DEPTH
+    const ground = this.add.graphics();
+    // Darker green-brown for the base
+    ground.fillStyle(0x1b2b1b, 1);
+    ground.beginPath();
+    ground.moveTo(100, horizonY);
+    ground.lineTo(700, horizonY);
+    ground.lineTo(width + 100, height);
+    ground.lineTo(-100, height);
+    ground.closePath();
+    ground.fillPath();
+
+    // Horizontal "Depth" lines (now more subtle and blended)
+    for (let i = 0; i < 12; i++) {
+        const y = horizonY + i * 35;
+        const alpha = 0.1 + (i / 12) * 0.2;
+        const stripe = this.add.graphics();
+        stripe.lineStyle(2, 0x000000, alpha);
+        const spread = (y - horizonY) * 0.5;
+        stripe.lineBetween(100 - spread, y, 700 + spread, y);
+    }
+
+    // 3. ENHANCED TREES DATA
+    const trees = [];
+    for (let i = 0; i < 35; i++) {
+        const depth = Phaser.Math.Between(0, 400); // 0 is back, 400 is front
+        const y = horizonY + depth;
+        const scale = 0.3 + (depth / 400) * 1.5;
+        // Adjust X range based on trapezoidal perspective
+        const xRange = 300 + (depth * 1.2); 
+        const x = (width / 2) + Phaser.Math.Between(-xRange / 2, xRange / 2);
         
-        const ground = this.add.graphics();
-        ground.fillStyle(0x3a5a3a, 1);
-        ground.fillRect(0, 500, 800, 100);
+        trees.push({ x, y, scale, depth });
+    }
+
+    // Sort trees by depth for proper painter's algorithm rendering
+    trees.sort((a, b) => a.depth - b.depth);
+
+    // 4. DRAWING THE TREES
+    trees.forEach(treeData => {
+        const tree = this.add.graphics();
+        const { x, y, scale, depth } = treeData;
         
-        for (let i = 0; i < 100; i++) {
-            const x = Phaser.Math.Between(0, 800);
-            const y = Phaser.Math.Between(500, 590);
-            const grass = this.add.graphics();
-            grass.fillStyle(0x4a7a4a, 1);
-            grass.fillTriangle(x, y, x - 2, y + 5, x + 2, y + 5);
+        // Dynamic Alpha for "Fog" effect (distant trees are hazier)
+        const fogAlpha = 0.4 + (depth / 400) * 0.6;
+        
+        // A. SHADOW (drawn first so it's under the tree)
+        tree.fillStyle(0x000000, 0.2);
+        tree.fillEllipse(x, y, 40 * scale, 15 * scale);
+
+        // B. TRUNK (Tapered)
+        const trunkW = 10 * scale;
+        const trunkH = 50 * scale;
+        tree.fillStyle(0x23180d, fogAlpha); // Dark wood
+        tree.beginPath();
+        tree.moveTo(x - trunkW/2, y);
+        tree.lineTo(x + trunkW/2, y);
+        tree.lineTo(x + trunkW/4, y - trunkH);
+        tree.lineTo(x - trunkW/4, y - trunkH);
+        tree.fillPath();
+
+        // C. FOLIAGE (Layered Conifer Look)
+        const layers = 3;
+        const foliageGreen = [0x1a331a, 0x244024, 0x2e522e]; // Dark to Light
+        
+        for (let j = 0; j < layers; j++) {
+            const lScale = scale * (1 - j * 0.2);
+            const lY = (y - trunkH) - (j * 20 * scale);
+            const lWidth = 60 * lScale;
+            const lHeight = 40 * lScale;
+
+            tree.fillStyle(foliageGreen[j], fogAlpha);
+            
+            // Draw a slightly "jagged" triangle for the pine effect
+            tree.beginPath();
+            tree.moveTo(x, lY - lHeight); // Tip
+            tree.lineTo(x + lWidth/2, lY); // Bottom Right
+            tree.lineTo(x - lWidth/2, lY); // Bottom Left
+            tree.closePath();
+            tree.fillPath();
         }
         
-        for (let i = 0; i < 20; i++) {
-            const x = Phaser.Math.Between(0, 800);
-            const height = Phaser.Math.Between(100, 200);
-            const tree = this.add.graphics();
-            tree.fillStyle(0x3a2a1a, 1);
-            tree.fillRect(x - 8, 500 - height, 16, height);
-            tree.fillStyle(0x2a4a2a, 0.8);
-            tree.fillCircle(x, 500 - height, 30);
-            tree.fillCircle(x - 20, 500 - height + 10, 25);
-            tree.fillCircle(x + 20, 500 - height + 10, 25);
-            tree.fillCircle(x, 500 - height - 20, 28);
+        // D. LIGHTING HIGHLIGHT (Slightly lighter side to give 3D volume)
+        tree.fillStyle(0xffffff, 0.05);
+        tree.fillTriangle(x, y - trunkH - 60*scale, x, y - trunkH, x + 20*scale, y - trunkH);
+    });
+
+    // 5. FOREGROUND FOG LAYER
+    // This blends the ground into the sky at the horizon
+    const fog = this.add.graphics();
+    fog.fillGradientStyle(0x1a2e1a, 0x1a2e1a, 0x1a2e1a, 0x1a2e1a, 0.8, 0.8, 0, 0);
+    fog.fillRect(0, horizonY - 20, width, 60);
+
+    // 6. GRASS PATCHES (Scattered last for depth)
+    for (let i = 0; i < 60; i++) {
+        const depth = Phaser.Math.Between(50, 400);
+        const y = horizonY + depth;
+        const x = Phaser.Math.Between(0, width);
+        const scale = 0.5 + (depth / 400);
+        
+        const grass = this.add.graphics();
+        grass.lineStyle(2 * scale, 0x3a5a3a, 0.5);
+        // Draw a small tuft of 3 lines
+        for(let g = 0; g < 3; g++) {
+            grass.lineBetween(x, y, x + (g-1)*5*scale, y - 10*scale);
         }
     }
+}
 
     onPlayerNearDragon() {
         if (!this.hasApproachedDragon) {
@@ -240,7 +335,6 @@ class ExplorationScene extends Phaser.Scene {
     }
 
     drawFlyingDragon(graphics) {
-        // FIXED: Replaced centerX/centerY with cx/cy to fix ReferenceError
         const cx = 60, cy = 40;
         graphics.fillStyle(0x000000, 0.2);
         graphics.fillEllipse(cx, cy + 30, 50, 10);
@@ -267,7 +361,6 @@ class ExplorationScene extends Phaser.Scene {
         graphics.fillTriangle(cx - 38, cy - 22, cx - 40, cy - 28, cx - 36, cy - 23);
         graphics.fillTriangle(cx - 32, cy - 22, cx - 34, cy - 28, cx - 30, cy - 23);
         graphics.fillStyle(0x2d2d2d, 0.9);
-        // Corrected line below:
         graphics.fillTriangle(cx - 10, cy - 5, cx - 25, cy - 25, cx - 5, cy + 5);
     }
 
@@ -329,7 +422,7 @@ class ExplorationScene extends Phaser.Scene {
 }
 
 // ============================================
-// ACT 3: BATTLE SCENE
+// ACT 3: BATTLE SCENE (First Battle)
 // ============================================
 class BattleScene extends Phaser.Scene {
     constructor() { super({ key: 'BattleScene' }); }
@@ -342,9 +435,8 @@ class BattleScene extends Phaser.Scene {
         this.gameOver = false;
 
         this.createBattleBackground();
-        this.generateFireballTextures(); // Generate pixel art textures
+        this.generateFireballTextures();
 
-        // Reuse the dragon texture generated in the Dragon class or fallbacks
         this.playerDragon = this.physics.add.sprite(150, 300, 'dragon_idle_0');
         this.playerDragon.setCollideWorldBounds(true);
         this.playerDragon.setSize(50, 35);
@@ -367,7 +459,6 @@ class BattleScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         
-        // Enemy AI
         this.time.addEvent({ delay: 1000, callback: this.enemyAI, callbackScope: this, loop: true });
         this.time.addEvent({ delay: 1800, callback: this.enemyShoot, callbackScope: this, loop: true });
     }
@@ -379,7 +470,6 @@ class BattleScene extends Phaser.Scene {
     }
 
     generateFireballTextures() {
-        // Player Fireball (Red-Orange)
         const pf = this.add.graphics();
         pf.fillStyle(0xff4400, 1); pf.fillCircle(10, 10, 10);
         pf.fillStyle(0xff8800, 1); pf.fillCircle(10, 10, 7);
@@ -387,7 +477,6 @@ class BattleScene extends Phaser.Scene {
         pf.generateTexture('player_fireball', 30, 20);
         pf.destroy();
 
-        // Enemy Fireball (Blue-Purple)
         const ef = this.add.graphics();
         ef.fillStyle(0x6600ff, 1); ef.fillCircle(10, 10, 10);
         ef.fillStyle(0x8800ff, 1); ef.fillCircle(10, 10, 7);
@@ -437,7 +526,6 @@ class BattleScene extends Phaser.Scene {
 
     enemyShoot() {
         if (this.gameOver || !this.enemyDragon.active) return;
-        
         const f = this.physics.add.sprite(this.enemyDragon.x - 40, this.enemyDragon.y, 'enemy_fireball');
         this.enemyFireballs.add(f);
         f.setVelocityX(-ENEMY_FIREBALL_SPEED);
@@ -446,30 +534,18 @@ class BattleScene extends Phaser.Scene {
     }
 
     hitEnemy(obj1, obj2) {
-        // SMART CHECK: Figure out which object is the fireball and which is the enemy
         let fireball, enemy;
-        if (obj1.texture.key === 'player_fireball') {
-            fireball = obj1;
-            enemy = obj2;
-        } else {
-            fireball = obj2;
-            enemy = obj1;
-        }
+        if (obj1.texture.key === 'player_fireball') { fireball = obj1; enemy = obj2; }
+        else { fireball = obj2; enemy = obj1; }
 
-        // 1. Safety Check
         if (!fireball.active) return;
-        if (enemy.isInvulnerable) return; // Ignore damage if blinking
+        if (enemy.isInvulnerable) return;
 
-        // 2. Destroy the fireball (Correctly!)
         fireball.destroy();
-
-        // 3. Decrease HP
         this.enemyHP--;
         this.updateEnemyHP();
-
-        // 4. Visual Feedback (Blink)
         enemy.setTint(0xff0000);
-        enemy.setAlpha(0.5); 
+        enemy.setAlpha(0.5);
         enemy.isInvulnerable = true;
 
         this.time.delayedCall(200, () => {
@@ -480,34 +556,20 @@ class BattleScene extends Phaser.Scene {
             }
         });
 
-        // 5. Victory Check
-        if (this.enemyHP <= 0) {
-            this.victory();
-        }
+        if (this.enemyHP <= 0) this.victory();
     }
-hitPlayer(obj1, obj2) {
-        // SMART CHECK: Figure out which object is the fireball and which is the player
-        let fireball, player;
-        if (obj1.texture.key === 'enemy_fireball') {
-            fireball = obj1;
-            player = obj2;
-        } else {
-            fireball = obj2;
-            player = obj1;
-        }
 
-        // 1. Safety Check
+    hitPlayer(obj1, obj2) {
+        let fireball, player;
+        if (obj1.texture.key === 'enemy_fireball') { fireball = obj1; player = obj2; }
+        else { fireball = obj2; player = obj1; }
+
         if (!fireball.active) return;
         if (player.isInvulnerable) return;
 
-        // 2. Destroy fireball
         fireball.destroy();
-
-        // 3. Decrease HP
         this.playerHP--;
         this.updatePlayerHP();
-
-        // 4. Visual Feedback
         this.cameras.main.shake(100, 0.01);
         player.setTint(0xff0000);
         player.setAlpha(0.5);
@@ -521,10 +583,7 @@ hitPlayer(obj1, obj2) {
             }
         });
 
-        // 5. Defeat Check
-        if (this.playerHP <= 0) {
-            this.defeat();
-        }
+        if (this.playerHP <= 0) this.defeat();
     }
 
     createUI() {
@@ -536,6 +595,480 @@ hitPlayer(obj1, obj2) {
     
     updatePlayerHP() { this.hpText.setText(`HP: ${"♥".repeat(this.playerHP)}`); }
     updateEnemyHP() { this.enemyText.setText(`HP: ${"♥".repeat(this.enemyHP)}`); }
+
+    victory() {
+        this.gameOver = true;
+        this.enemyDragon.destroy();
+        this.add.text(400, 300, "VICTORY!", { fontSize: '60px', fill: '#00ff00' }).setOrigin(0.5);
+        // CHANGED: Transition to RiverRestScene instead of VictoryScene
+        this.time.delayedCall(2000, () => this.scene.start('RiverRestScene'));
+    }
+
+    defeat() {
+        this.gameOver = true;
+        this.physics.pause();
+        this.add.text(400, 300, "DEFEATED\nPress R", { fontSize: '48px', fill: '#ff0000', align: 'center' }).setOrigin(0.5);
+        this.input.keyboard.once('keydown-R', () => this.scene.restart());
+    }
+}
+
+// ============================================
+// ACT 4: RIVER REST SCENE
+// ============================================
+class RiverRestScene extends Phaser.Scene {
+    constructor() { super({ key: 'RiverRestScene' }); }
+
+    create() {
+        this.cameras.main.fadeIn(1000);
+        this.createRiverBackground();
+        this.createCharacters();
+        this.dialogueBox = new DialogueBox(this);
+        this.dialogueShown = false;
+        
+        this.input.on('pointerdown', () => {
+            if (!this.dialogueShown) {
+                this.startRestDialogue();
+            } else if (this.dialogueBox.isVisible()) {
+                this.dialogueBox.handleClick();
+            }
+        });
+        
+        this.hintText = this.add.text(400, 570, 'Click to continue...', { fontSize: '18px', fill: '#4ecca3', fontFamily: 'Courier New' }).setOrigin(0.5);
+        this.tweens.add({ targets: this.hintText, alpha: 0.5, duration: 1000, yoyo: true, repeat: -1 });
+    }
+
+    createRiverBackground() {
+        const sky = this.add.graphics();
+        sky.fillGradientStyle(0x87ceeb, 0x87ceeb, 0xb0d4f1, 0xb0d4f1, 1);
+        sky.fillRect(0, 0, 800, 600);
+        
+        for (let i = 0; i < 5; i++) {
+            const mountain = this.add.graphics();
+            mountain.fillStyle(0x5a6a5a, 0.6);
+            const x = i * 200 - 50;
+            mountain.fillTriangle(x, 400, x + 100, 250, x + 200, 400);
+        }
+        
+        for (let i = 0; i < 15; i++) {
+            const x = Phaser.Math.Between(0, 800);
+            const y = Phaser.Math.Between(350, 380);
+            const trunk = this.add.graphics();
+            trunk.fillStyle(0x4a3520, 1);
+            trunk.fillRect(x - 5, y, 10, 30);
+            const tree = this.add.graphics();
+            tree.fillStyle(0x2a5a2a, 1);
+            tree.fillTriangle(x, y - 10, x - 15, y + 10, x + 15, y + 10);
+            tree.fillTriangle(x, y - 20, x - 12, y, x + 12, y);
+            tree.fillTriangle(x, y - 30, x - 10, y - 10, x + 10, y - 10);
+        }
+        
+        const grass = this.add.graphics();
+        grass.fillStyle(0x5a8a4a, 1);
+        grass.fillRect(0, 380, 800, 100);
+        
+        const river = this.add.graphics();
+        river.fillStyle(0x4a8aca, 0.7);
+        river.fillRect(0, 480, 800, 120);
+        
+        for (let i = 0; i < 20; i++) {
+            const wave = this.add.graphics();
+            wave.fillStyle(0x6aaadb, 0.5);
+            wave.fillCircle(0, 0, 8);
+            wave.x = Phaser.Math.Between(0, 800);
+            wave.y = Phaser.Math.Between(490, 580);
+            this.tweens.add({ targets: wave, x: wave.x + 50, alpha: 0.2, duration: 3000, repeat: -1, yoyo: true });
+        }
+        
+        for (let i = 0; i < 10; i++) {
+            const sparkle = this.add.graphics();
+            sparkle.fillStyle(0xffffff, 1);
+            sparkle.fillCircle(0, 0, 2);
+            sparkle.x = Phaser.Math.Between(0, 800);
+            sparkle.y = Phaser.Math.Between(490, 580);
+            this.tweens.add({ targets: sparkle, alpha: 0, duration: 1000, repeat: -1, yoyo: true, delay: Phaser.Math.Between(0, 1000) });
+        }
+    }
+
+    createCharacters() {
+        // Reuse dragon drawing logic but just create a graphic here for simplicity as it is a cutscene
+        const dragonGraphics = this.add.graphics();
+        const cx = 40, cy = 30;
+        dragonGraphics.fillStyle(COLORS.dragon.body, 1);
+        dragonGraphics.fillEllipse(cx, cy, 50, 35);
+        dragonGraphics.fillEllipse(cx - 25, cy - 15, 30, 30);
+        dragonGraphics.fillStyle(COLORS.dragon.belly, 1);
+        dragonGraphics.fillEllipse(cx, cy + 3, 38, 25);
+        dragonGraphics.fillStyle(0xffff00, 1);
+        dragonGraphics.fillCircle(cx - 30, cy - 18, 5);
+        dragonGraphics.generateTexture('dragon_standing', 100, 70);
+        dragonGraphics.destroy();
+        
+        this.dragon = this.add.sprite(600, 370, 'dragon_standing');
+        this.dragon.setScale(1.5);
+        
+        this.tweens.add({ targets: this.dragon, scaleY: 1.52, duration: 2000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        
+        const playerGraphics = this.add.graphics();
+        const px = 16, py = 16;
+        playerGraphics.fillStyle(COLORS.player.pants, 1);
+        playerGraphics.fillRect(px - 4, py + 5, 3, 7);
+        playerGraphics.fillRect(px + 1, py + 5, 3, 7);
+        playerGraphics.fillStyle(0x4a3520, 1);
+        playerGraphics.fillRect(px - 5, py + 11, 4, 2);
+        playerGraphics.fillRect(px + 1, py + 11, 4, 2);
+        playerGraphics.fillStyle(COLORS.player.shirt, 1);
+        playerGraphics.fillRect(px - 5, py - 2, 10, 8);
+        playerGraphics.fillStyle(COLORS.player.skin, 1);
+        playerGraphics.fillRect(px - 7, py, 3, 6);
+        playerGraphics.fillRect(px + 4, py, 3, 6);
+        playerGraphics.fillCircle(px, py - 6, 5);
+        playerGraphics.fillStyle(COLORS.player.hair, 1);
+        playerGraphics.fillCircle(px - 2, py - 9, 4);
+        playerGraphics.fillCircle(px + 2, py - 9, 4);
+        playerGraphics.generateTexture('player_standing', 32, 32);
+        playerGraphics.destroy();
+        
+        this.player = this.add.sprite(500, 400, 'player_standing');
+        this.player.setScale(2);
+    }
+
+    startRestDialogue() {
+        this.dialogueShown = true;
+        this.hintText.setVisible(false);
+        const dialogues = [
+            { speaker: 'You', text: 'That was a tough fight, buddy. We need a break.' },
+            { speaker: 'Toothless', text: '*Nods and settles down by the river*' },
+            { speaker: 'You', text: 'Every battle makes us stronger... I can feel our bond growing.' },
+            { speaker: 'Toothless', text: '*Makes a contented rumbling sound*' },
+            { speaker: 'You', text: 'Let\'s get some rest. Tomorrow is a big day.' }
+        ];
+        this.dialogueBox.show(dialogues, () => this.nightSkip());
+    }
+
+    nightSkip() {
+        const blackout = this.add.graphics();
+        blackout.fillStyle(0x000000, 1);
+        blackout.fillRect(0, 0, 800, 600);
+        blackout.setAlpha(0);
+        blackout.setDepth(200);
+        
+        this.tweens.add({
+            targets: blackout, alpha: 1, duration: 2000,
+            onComplete: () => {
+                const nightText = this.add.text(400, 300, 'The night passes peacefully...', { fontSize: '28px', fill: '#ffffff', fontFamily: 'Courier New', align: 'center' }).setOrigin(0.5).setDepth(201).setAlpha(0);
+                this.tweens.add({
+                    targets: nightText, alpha: 1, duration: 1500, hold: 2000,
+                    onComplete: () => this.morningFade(blackout, nightText)
+                });
+            }
+        });
+    }
+
+    morningFade(blackout, nightText) {
+        this.tweens.add({ targets: nightText, alpha: 0, duration: 1000, onComplete: () => nightText.destroy() });
+        
+        const morning = this.add.graphics();
+        morning.fillGradientStyle(0xffeeaa, 0xffeeaa, 0xffd666, 0xffd666, 1);
+        morning.fillRect(0, 0, 800, 600);
+        morning.setAlpha(0);
+        morning.setDepth(199);
+        
+        this.tweens.add({ targets: blackout, alpha: 0, duration: 2000 });
+        this.tweens.add({
+            targets: morning, alpha: 1, duration: 2000,
+            onComplete: () => this.time.delayedCall(1000, () => this.ambush(morning))
+        });
+    }
+
+    ambush(morning) {
+        const exclamation = this.add.text(this.player.x, this.player.y - 50, '!', { fontSize: '48px', fill: '#ff0000', fontFamily: 'Courier New', stroke: '#ffffff', strokeThickness: 4 }).setOrigin(0.5).setAlpha(0).setDepth(300);
+        this.tweens.add({ targets: exclamation, alpha: 1, scaleX: 1.5, scaleY: 1.5, duration: 200, yoyo: true, repeat: 2 });
+        
+        const fastEnemyGraphics = this.add.graphics();
+        fastEnemyGraphics.fillStyle(0x8a2d2d, 1);
+        fastEnemyGraphics.fillEllipse(40, 30, 60, 40);
+        fastEnemyGraphics.fillEllipse(15, 12, 25, 25);
+        fastEnemyGraphics.fillStyle(0xff0000, 1);
+        fastEnemyGraphics.fillCircle(10, 8, 6);
+        fastEnemyGraphics.fillStyle(0xaa4a4a, 1);
+        fastEnemyGraphics.fillTriangle(40, 10, 35, 0, 45, 10);
+        fastEnemyGraphics.fillTriangle(50, 10, 45, 0, 55, 10);
+        fastEnemyGraphics.generateTexture('fast_enemy', 80, 60);
+        fastEnemyGraphics.destroy();
+        
+        this.fastEnemy = this.add.sprite(-100, 200, 'fast_enemy');
+        this.fastEnemy.setScale(1.8);
+        this.fastEnemy.setDepth(300);
+        
+        this.tweens.add({
+            targets: this.fastEnemy, x: 300, duration: 1500, ease: 'Cubic.easeOut',
+            onComplete: () => {
+                const warningText = this.add.text(400, 150, 'AMBUSH!', { fontSize: '42px', fill: '#ff3333', fontFamily: 'Courier New', stroke: '#000000', strokeThickness: 6 }).setOrigin(0.5).setDepth(301);
+                this.cameras.main.shake(800, 0.02);
+                this.tweens.add({
+                    targets: warningText, scaleX: 1.3, scaleY: 1.3, duration: 300, yoyo: true, repeat: 2,
+                    onComplete: () => this.time.delayedCall(1000, () => {
+                        this.cameras.main.fadeOut(1000);
+                        this.time.delayedCall(1000, () => this.scene.start('Battle2Scene'));
+                    })
+                });
+            }
+        });
+        
+        this.tweens.add({ targets: this.fastEnemy, scaleY: 1.85, duration: 200, yoyo: true, repeat: -1 });
+    }
+}
+
+// ============================================
+// ACT 5: BATTLE 2 SCENE (Faster + River)
+// ============================================
+class Battle2Scene extends Phaser.Scene {
+    constructor() { super({ key: 'Battle2Scene' }); }
+
+    create() {
+        this.cameras.main.fadeIn(1000);
+        this.playerHP = 3;
+        this.enemyHP = 3;
+        this.canShoot = true;
+        this.gameOver = false;
+        
+        // Background with River
+        const sky = this.add.graphics();
+        sky.fillGradientStyle(0xffeeaa, 0xffeeaa, 0x87ceeb, 0x87ceeb, 1);
+        sky.fillRect(0, 0, 800, 500);
+        
+        const river = this.add.graphics();
+        river.fillStyle(0x4a8aca, 0.8);
+        river.fillRect(0, 500, 800, 100);
+        
+        this.riverWaves = [];
+        for (let i = 0; i < 15; i++) {
+            const wave = this.add.graphics();
+            wave.fillStyle(0x6aaadb, 0.6);
+            wave.fillCircle(0, 0, 10);
+            wave.x = Phaser.Math.Between(0, 800);
+            wave.y = Phaser.Math.Between(510, 580);
+            this.riverWaves.push(wave);
+            this.tweens.add({ targets: wave, x: wave.x + 80, alpha: 0.2, duration: 2500, repeat: -1, yoyo: false });
+        }
+        
+        this.clouds = [];
+        for (let i = 0; i < 8; i++) {
+            const cloud = this.add.graphics();
+            cloud.fillStyle(0xffffff, 0.4);
+            for (let j = 0; j < 5; j++) cloud.fillCircle(j * 16, 0, 14);
+            cloud.x = Phaser.Math.Between(0, 800);
+            cloud.y = Phaser.Math.Between(50, 400);
+            cloud.scrollSpeed = Phaser.Math.Between(3, 6);
+            this.clouds.push(cloud);
+        }
+        
+        this.playerDragon = this.physics.add.sprite(150, 250, 'dragon_idle_0');
+        this.playerDragon.setCollideWorldBounds(true);
+        this.playerDragon.setSize(50, 35);
+        this.playerDragon.setOffset(15, 12);
+        this.playerDragon.setScale(1.2);
+        this.playerDragon.anims.play('dragon_idle');
+        
+        this.enemyDragon = this.physics.add.sprite(650, 250, 'enemy_dragon_idle_0');
+        this.enemyDragon.setSize(50, 35);
+        this.enemyDragon.setOffset(15, 12);
+        this.enemyDragon.setScale(1.3);
+        this.enemyDragon.setFlipX(true);
+        this.enemyDragon.setTint(0xff6666);
+        this.enemyDragon.anims.play('enemy_dragon_idle');
+        
+        this.playerFireballs = this.physics.add.group();
+        this.enemyFireballs = this.physics.add.group();
+        
+        // IMPORTANT: UPDATED HIT DETECTION to fix disappearing bug
+        this.physics.add.overlap(this.playerFireballs, this.enemyDragon, this.hitEnemy, null, this);
+        this.physics.add.overlap(this.enemyFireballs, this.playerDragon, this.hitPlayer, null, this);
+        
+        this.createUI();
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        
+        this.fasterEnemyAI();
+        
+        const startText = this.add.text(400, 50, 'FINAL BATTLE!', { fontSize: '42px', fill: '#ff3333', fontFamily: 'Courier New', stroke: '#000000', strokeThickness: 6 }).setOrigin(0.5).setAlpha(0);
+        this.tweens.add({ targets: startText, alpha: 1, scaleX: 1.4, scaleY: 1.4, duration: 500, ease: 'Back.easeOut', onComplete: () => {
+            this.time.delayedCall(1500, () => {
+                this.tweens.add({ targets: startText, alpha: 0, duration: 500, onComplete: () => startText.destroy() });
+            });
+        }});
+    }
+
+    update() {
+        if (this.gameOver) return;
+        
+        this.clouds.forEach(cloud => {
+            cloud.x -= cloud.scrollSpeed;
+            if (cloud.x < -150) { cloud.x = 950; cloud.y = Phaser.Math.Between(50, 400); }
+        });
+        
+        this.riverWaves.forEach(wave => {
+            if (wave.x > 850) wave.x = -50;
+        });
+        
+        let vx = 0, vy = 0;
+        const speed = DRAGON_SPEED * 1.1;
+        if (this.cursors.left.isDown) vx = -speed;
+        else if (this.cursors.right.isDown) vx = speed;
+        if (this.cursors.up.isDown) vy = -speed;
+        else if (this.cursors.down.isDown) vy = speed;
+        
+        this.playerDragon.setVelocity(vx, vy);
+        if (vx !== 0 && vy !== 0) this.playerDragon.setVelocity(vx * 0.707, vy * 0.707);
+        
+        if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) this.playerShoot();
+    }
+
+    playerShoot() {
+        if (!this.canShoot || this.gameOver) return;
+        this.canShoot = false;
+        
+        // Re-generate texture if needed (Battle 1 creates it, but good to be safe)
+        if (!this.textures.exists('player_fireball2')) {
+            const pf = this.add.graphics();
+            pf.fillStyle(0xff4400, 1); pf.fillCircle(10, 10, 10);
+            pf.generateTexture('player_fireball2', 30, 20); pf.destroy();
+        }
+
+        const fireball = this.physics.add.sprite(this.playerDragon.x + 40, this.playerDragon.y, 'player_fireball2');
+        this.playerFireballs.add(fireball);
+        fireball.setVelocityX(FIREBALL_SPEED);
+        fireball.setScale(0.8);
+        this.tweens.add({ targets: fireball, angle: 360, duration: 1000, repeat: -1 });
+        
+        this.time.delayedCall(600, () => this.canShoot = true);
+    }
+
+    enemyShoot() {
+        if (this.gameOver || !this.enemyDragon.active) return;
+        
+        if (!this.textures.exists('fast_enemy_fireball')) {
+            const ef = this.add.graphics();
+            ef.fillStyle(0xff0000, 1); ef.fillCircle(10, 10, 12);
+            ef.generateTexture('fast_enemy_fireball', 35, 25); ef.destroy();
+        }
+        
+        const fireball = this.physics.add.sprite(this.enemyDragon.x - 40, this.enemyDragon.y, 'fast_enemy_fireball');
+        this.enemyFireballs.add(fireball);
+        fireball.setVelocityX(-450);
+        fireball.setScale(0.9);
+        this.tweens.add({ targets: fireball, angle: -360, duration: 800, repeat: -1 });
+    }
+
+    fasterEnemyAI() {
+        this.time.addEvent({ delay: 800, callback: () => {
+            if (this.gameOver) return;
+            const targetY = this.playerDragon.y + Phaser.Math.Between(-80, 80);
+            this.tweens.add({ targets: this.enemyDragon, y: Phaser.Math.Clamp(targetY, 80, 450), duration: 600, ease: 'Cubic.easeInOut' });
+        }, callbackScope: this, loop: true });
+        
+        this.time.addEvent({ delay: 1500, callback: () => {
+            if (this.gameOver) return;
+            this.enemyShoot();
+        }, callbackScope: this, loop: true });
+    }
+
+    // *** FIX: ROBUST HIT DETECTION (Prevent vanishing) ***
+    hitEnemy(obj1, obj2) {
+        let fireball, enemy;
+        // Check textrue keys to identify objects
+        if (obj1.texture.key === 'player_fireball2' || obj1.texture.key === 'player_fireball') {
+             fireball = obj1; enemy = obj2; 
+        } else { 
+            fireball = obj2; enemy = obj1; 
+        }
+
+        if (!fireball.active) return;
+        if (enemy.isInvulnerable) return;
+
+        fireball.destroy();
+        this.enemyHP--;
+        this.updateEnemyHP();
+        
+        enemy.setTint(0xff0000);
+        enemy.setAlpha(0.5);
+        enemy.isInvulnerable = true;
+
+        this.time.delayedCall(200, () => {
+            if (enemy.active) {
+                enemy.clearTint();
+                enemy.setTint(0xff6666); // Restore reddish tint
+                enemy.setAlpha(1);
+                enemy.isInvulnerable = false;
+            }
+        });
+
+        if (this.enemyHP <= 0) this.victory();
+    }
+
+    hitPlayer(obj1, obj2) {
+        let fireball, player;
+        if (obj1.texture.key === 'fast_enemy_fireball' || obj1.texture.key === 'enemy_fireball') {
+             fireball = obj1; player = obj2; 
+        } else { 
+            fireball = obj2; player = obj1; 
+        }
+
+        if (!fireball.active) return;
+        if (player.isInvulnerable) return;
+
+        fireball.destroy();
+        this.playerHP--;
+        this.updatePlayerHP();
+        this.cameras.main.shake(100, 0.01);
+        
+        player.setTint(0xff0000);
+        player.setAlpha(0.5);
+        player.isInvulnerable = true;
+
+        this.time.delayedCall(500, () => {
+            if (player.active) {
+                player.clearTint();
+                player.setAlpha(1);
+                player.isInvulnerable = false;
+            }
+        });
+
+        if (this.playerHP <= 0) this.defeat();
+    }
+
+    createUI() {
+        this.playerHPContainer = this.add.container(20, 20);
+        this.updatePlayerHP();
+        this.enemyHPContainer = this.add.container(780, 20);
+        this.updateEnemyHP();
+        const hint = this.add.text(400, 470, 'FASTER ENEMY! Stay alert!', { fontSize: '18px', fill: '#ff6b6b', fontFamily: 'Courier New' }).setOrigin(0.5);
+        this.tweens.add({ targets: hint, alpha: 0.3, duration: 800, yoyo: true, repeat: 3, onComplete: () => hint.destroy() });
+    }
+    
+    updatePlayerHP() { 
+        this.playerHPContainer.removeAll(true);
+        const label = this.add.text(0, 0, 'YOU', { fontSize: '18px', fill: '#4ecca3', fontFamily: 'Courier New' });
+        this.playerHPContainer.add(label);
+        for (let i = 0; i < this.playerHP; i++) {
+            const heart = this.add.graphics();
+            heart.fillStyle(0xff6b9d, 1);
+            heart.fillCircle(i * 20, 23, 4);
+            this.playerHPContainer.add(heart);
+        }
+    }
+    
+    updateEnemyHP() { 
+        this.enemyHPContainer.removeAll(true);
+        const label = this.add.text(0, 0, 'FURY', { fontSize: '18px', fill: '#ff3333', fontFamily: 'Courier New' }).setOrigin(1, 0);
+        this.enemyHPContainer.add(label);
+        for (let i = 0; i < this.enemyHP; i++) {
+            const heart = this.add.graphics();
+            heart.fillStyle(0xff0000, 1);
+            heart.fillCircle(-i * 20 - 20, 23, 4);
+            this.enemyHPContainer.add(heart);
+        }
+    }
 
     victory() {
         this.gameOver = true;

@@ -36,7 +36,8 @@
                     default: 'arcade',
                     arcade: { gravity: { y: 0 }, debug: false }
                 },
-                scene: [IntroScene, ExplorationScene, BattleScene, VictoryScene]
+                // Updated scene list with RiverRestScene and Battle2Scene
+                scene: [IntroScene, ExplorationScene, BattleScene, RiverRestScene, Battle2Scene, VictoryScene]
             };
 
             const game = new Phaser.Game(config);
