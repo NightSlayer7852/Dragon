@@ -31,7 +31,7 @@ class DialogueBox {
         this.overlay = this.scene.add.graphics();
         this.overlay.fillStyle(0x000000, 0.5);
         this.overlay.fillRect(0, 0, 800, 600);
-        this.overlay.setDepth(100);
+        this.overlay.setDepth(2000);
         this.overlay.setVisible(false);
 
         this.box = this.scene.add.graphics();
@@ -39,7 +39,7 @@ class DialogueBox {
         this.box.fillRoundedRect(50, 420, 700, 150, 10);
         this.box.lineStyle(3, 0x4ecca3, 1);
         this.box.strokeRoundedRect(50, 420, 700, 150, 10);
-        this.box.setDepth(101);
+        this.box.setDepth(2001);
         this.box.setVisible(false);
 
         this.nameText = this.scene.add.text(70, 435, '', { fontSize: '20px', fill: '#4ecca3', fontFamily: 'Courier New', fontStyle: 'bold' });
@@ -47,11 +47,11 @@ class DialogueBox {
         this.nameText.setVisible(false);
 
         this.textObject = this.scene.add.text(70, 470, '', { fontSize: '18px', fill: '#ffffff', fontFamily: 'Courier New', wordWrap: { width: 650 }, lineSpacing: 5 });
-        this.textObject.setDepth(102);
+        this.textObject.setDepth(2002);
         this.textObject.setVisible(false);
 
         this.continueIndicator = this.scene.add.text(720, 550, '▼', { fontSize: '20px', fill: '#4ecca3', fontFamily: 'Courier New' });
-        this.continueIndicator.setDepth(102);
+        this.continueIndicator.setDepth(2002);
         this.continueIndicator.setVisible(false);
         
         this.scene.tweens.add({ targets: this.continueIndicator, alpha: 0.3, duration: 500, yoyo: true, repeat: -1 });

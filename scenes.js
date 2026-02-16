@@ -6,8 +6,8 @@ class IntroScene extends Phaser.Scene {
 
     create() {
         this.createForest();
-        this.player = new Player(this, 150, 450);
-        this.dragon = new Dragon(this, 600, 300, 'friendly');
+        this.player = new Player(this, 250, 400);
+        this.dragon = new Dragon(this, 750, 400, 'friendly');
         this.dialogueBox = new DialogueBox(this);
         
         this.hasApproachedDragon = false;
@@ -44,22 +44,13 @@ class IntroScene extends Phaser.Scene {
     const height = 600;
     const horizonY = 200;
 
-    // 1. SKY & ATMOSPHERE
-    // Darker midnight blue to a deep forest green near the horizon
+    // 1. SKY & BACKGROUND
     const sky = this.add.graphics();
     sky.fillGradientStyle(0x050a05, 0x050a05, 0x1a2e1a, 0x1a2e1a, 1);
     sky.fillRect(0, 0, width, horizonY);
     
-    // Add distant "stars" or fireflies in the sky
-    for (let i = 0; i < 30; i++) {
-        const star = this.add.graphics();
-        star.fillStyle(0xffffff, Phaser.Math.FloatBetween(0.1, 0.4));
-        star.fillCircle(Phaser.Math.Between(0, width), Phaser.Math.Between(0, horizonY), 1);
-    }
-
-    // 2. GROUND WITH DEPTH
+    // 2. GROUND
     const ground = this.add.graphics();
-    // Darker green-brown for the base
     ground.fillStyle(0x1b2b1b, 1);
     ground.beginPath();
     ground.moveTo(100, horizonY);
@@ -68,102 +59,79 @@ class IntroScene extends Phaser.Scene {
     ground.lineTo(-100, height);
     ground.closePath();
     ground.fillPath();
+    ground.setDepth(0); // Ground is always at the bottom
 
-    // Horizontal "Depth" lines (now more subtle and blended)
-    for (let i = 0; i < 12; i++) {
-        const y = horizonY + i * 35;
-        const alpha = 0.1 + (i / 12) * 0.2;
-        const stripe = this.add.graphics();
-        stripe.lineStyle(2, 0x000000, alpha);
-        const spread = (y - horizonY) * 0.5;
-        stripe.lineBetween(100 - spread, y, 700 + spread, y);
-    }
-
-    // 3. ENHANCED TREES DATA
-    const trees = [];
-    for (let i = 0; i < 35; i++) {
-        const depth = Phaser.Math.Between(0, 400); // 0 is back, 400 is front
+    // 3. TREE GENERATION WITH EDGE BIAS
+    const treeCount = 40;
+    for (let i = 0; i < treeCount; i++) {
+        const depth = Phaser.Math.Between(0, 400);
         const y = horizonY + depth;
-        const scale = 0.3 + (depth / 400) * 1.5;
-        // Adjust X range based on trapezoidal perspective
-        const xRange = 300 + (depth * 1.2); 
-        const x = (width / 2) + Phaser.Math.Between(-xRange / 2, xRange / 2);
+        const scale = 0.4 + (depth / 400) * 1.4;
         
-        trees.push({ x, y, scale, depth });
+        // --- DENSITY LOGIC ---
+        // We calculate a 'margin' based on depth to follow the trapezoid shape
+        const currentWidth = 600 + (depth * 0.5); 
+        const centerX = width / 2;
+        
+        let x;
+        // 80% chance to spawn on edges, 20% to spawn near the middle
+        if (Phaser.Math.FloatBetween(0, 1) > 0.2) {
+            // Spawn on Left or Right edges (leaving the middle 30% empty)
+            const side = Phaser.Math.Between(0, 1) ? -1 : 1;
+            const offset = Phaser.Math.Between(currentWidth * 0.15, currentWidth * 0.5);
+            x = centerX + (side * offset);
+        } else {
+            // Sparse trees in the middle
+            x = Phaser.Math.Between(centerX - 100, centerX + 100);
+        }
+
+        this.drawTree(x, y, scale, depth);
     }
+}
 
-    // Sort trees by depth for proper painter's algorithm rendering
-    trees.sort((a, b) => a.depth - b.depth);
+// Separate function to draw the tree for cleaner code
+drawTree(x, y, scale, depth) {
+    const tree = this.add.graphics();
+    
+    // IMPORTANT: Depth Sorting
+    // This ensures the player (if their depth is also set to Y) 
+    // moves behind/in front of trees correctly.
+    tree.setDepth(y);
 
-    // 4. DRAWING THE TREES
-    trees.forEach(treeData => {
-        const tree = this.add.graphics();
-        const { x, y, scale, depth } = treeData;
-        
-        // Dynamic Alpha for "Fog" effect (distant trees are hazier)
-        const fogAlpha = 0.4 + (depth / 400) * 0.6;
-        
-        // A. SHADOW (drawn first so it's under the tree)
-        tree.fillStyle(0x000000, 0.2);
-        tree.fillEllipse(x, y, 40 * scale, 15 * scale);
+    const fogAlpha = 0.5 + (depth / 400) * 0.5;
+    
+    // 1. SHADOW
+    tree.fillStyle(0x000000, 0.2);
+    tree.fillEllipse(x, y, 40 * scale, 15 * scale);
 
-        // B. TRUNK (Tapered)
-        const trunkW = 10 * scale;
-        const trunkH = 50 * scale;
-        tree.fillStyle(0x23180d, fogAlpha); // Dark wood
+    // 2. TRUNK
+    const trunkW = 12 * scale;
+    const trunkH = 45 * scale;
+    tree.fillStyle(0x23180d, fogAlpha);
+    tree.fillRect(x - trunkW/2, y - trunkH, trunkW, trunkH);
+
+    // 3. FOLIAGE (Layered Conifer)
+    const layers = 3;
+    const colors = [0x1a331a, 0x244024, 0x2e522e];
+    
+    for (let i = 0; i < layers; i++) {
+        const lScale = scale * (1 - i * 0.25);
+        const lY = (y - trunkH) - (i * 25 * scale);
+        const lWidth = 70 * lScale;
+        const lHeight = 50 * lScale;
+
+        tree.fillStyle(colors[i], fogAlpha);
         tree.beginPath();
-        tree.moveTo(x - trunkW/2, y);
-        tree.lineTo(x + trunkW/2, y);
-        tree.lineTo(x + trunkW/4, y - trunkH);
-        tree.lineTo(x - trunkW/4, y - trunkH);
+        tree.moveTo(x, lY - lHeight);
+        tree.lineTo(x + lWidth/2, lY);
+        tree.lineTo(x - lWidth/2, lY);
+        tree.closePath();
         tree.fillPath();
-
-        // C. FOLIAGE (Layered Conifer Look)
-        const layers = 3;
-        const foliageGreen = [0x1a331a, 0x244024, 0x2e522e]; // Dark to Light
-        
-        for (let j = 0; j < layers; j++) {
-            const lScale = scale * (1 - j * 0.2);
-            const lY = (y - trunkH) - (j * 20 * scale);
-            const lWidth = 60 * lScale;
-            const lHeight = 40 * lScale;
-
-            tree.fillStyle(foliageGreen[j], fogAlpha);
-            
-            // Draw a slightly "jagged" triangle for the pine effect
-            tree.beginPath();
-            tree.moveTo(x, lY - lHeight); // Tip
-            tree.lineTo(x + lWidth/2, lY); // Bottom Right
-            tree.lineTo(x - lWidth/2, lY); // Bottom Left
-            tree.closePath();
-            tree.fillPath();
-        }
-        
-        // D. LIGHTING HIGHLIGHT (Slightly lighter side to give 3D volume)
-        tree.fillStyle(0xffffff, 0.05);
-        tree.fillTriangle(x, y - trunkH - 60*scale, x, y - trunkH, x + 20*scale, y - trunkH);
-    });
-
-    // 5. FOREGROUND FOG LAYER
-    // This blends the ground into the sky at the horizon
-    const fog = this.add.graphics();
-    fog.fillGradientStyle(0x1a2e1a, 0x1a2e1a, 0x1a2e1a, 0x1a2e1a, 0.8, 0.8, 0, 0);
-    fog.fillRect(0, horizonY - 20, width, 60);
-
-    // 6. GRASS PATCHES (Scattered last for depth)
-    for (let i = 0; i < 60; i++) {
-        const depth = Phaser.Math.Between(50, 400);
-        const y = horizonY + depth;
-        const x = Phaser.Math.Between(0, width);
-        const scale = 0.5 + (depth / 400);
-        
-        const grass = this.add.graphics();
-        grass.lineStyle(2 * scale, 0x3a5a3a, 0.5);
-        // Draw a small tuft of 3 lines
-        for(let g = 0; g < 3; g++) {
-            grass.lineBetween(x, y, x + (g-1)*5*scale, y - 10*scale);
-        }
     }
+
+    // Optional: Add a physical hitbox if you are using Arcade Physics
+    // const hitBox = this.add.rectangle(x, y, 20 * scale, 10 * scale);
+    // this.physics.add.existing(hitBox, true); 
 }
 
     onPlayerNearDragon() {
